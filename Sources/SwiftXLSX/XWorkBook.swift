@@ -41,7 +41,7 @@ final public class XWorkBook{
     private var valss:Set<String> = Set([])
     private var CHARSIZE:[UInt64:CGFloat] = [:]
     
-    private let showModified:Bool = false
+    private let showModified:Bool = true
     
     public init() {}
     
@@ -470,13 +470,42 @@ final public class XWorkBook{
     }
     
     private var rels:String {
-        "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n<Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\"><Relationship Id=\"rId1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument\" Target=\"xl/workbook.xml\"/></Relationships>"
+        """
+<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n
+<Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\">
+<Relationship Id=\"rId1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument\" Target=\"xl/workbook.xml\"/></Relationships>
+"""
+    }
+    
+    private var docPropApp:String{
+        """
+        <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+        <Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties" xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes"><Application>Microsoft Macintosh Excel</Application><DocSecurity>0</DocSecurity><ScaleCrop>false</ScaleCrop><HeadingPairs><vt:vector size="2" baseType="variant"><vt:variant><vt:lpstr>Worksheets</vt:lpstr></vt:variant><vt:variant><vt:i4>1</vt:i4></vt:variant></vt:vector></HeadingPairs><TitlesOfParts><vt:vector size="1" baseType="lpstr"><vt:lpstr>22-03-2024</vt:lpstr></vt:vector></TitlesOfParts><LinksUpToDate>false</LinksUpToDate><SharedDoc>false</SharedDoc><HyperlinksChanged>false</HyperlinksChanged><AppVersion>16.0300</AppVersion></Properties>
+        """
+    }
+    
+    private var docPropCore:String{
+        """
+        <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+        <cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:dcmitype="http://purl.org/dc/dcmitype/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><cp:lastModifiedBy>Aga Francis Amiel Anciano</cp:lastModifiedBy><dcterms:created xsi:type="dcterms:W3CDTF">2024-03-22T05:38:08Z</dcterms:created><dcterms:modified xsi:type="dcterms:W3CDTF">2024-03-22T05:38:08Z</dcterms:modified></cp:coreProperties>
+        """
+    }
+    
+    private var SharedStringsOriginal:String {
+        let Xml:NSMutableString = NSMutableString()
+        Xml.append("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n")
+        Xml.append("<sst xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\" uniqueCount=\"\(self.vals.count)\">")
+        for val in vals {
+            Xml.append("<si><t>\(val.XmlPrep())</t></si>")
+        }
+        Xml.append("</sst>")
+        return String(Xml)
     }
     
     private var SharedStrings:String {
         let Xml:NSMutableString = NSMutableString()
         Xml.append("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n")
-        Xml.append("<sst xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\" uniqueCount=\"\(self.vals.count)\">")
+        Xml.append("<sst xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\" count=\"22\" uniqueCount=\"\(self.vals.count)\">")
         for val in vals {
             Xml.append("<si><t>\(val.XmlPrep())</t></si>")
         }
@@ -546,7 +575,7 @@ final public class XWorkBook{
         return String(Xml)
     }
     
-    private var ContentTypesStrings:String {
+    private var ContentTypesStringsOriginal:String {
         let Xml:NSMutableString = NSMutableString()
         Xml.append("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n")
         Xml.append("<Types xmlns=\"http://schemas.openxmlformats.org/package/2006/content-types\">")
@@ -572,6 +601,39 @@ final public class XWorkBook{
         return String(Xml)
     }
     
+    private var ContentTypesStrings:String {
+        let Xml:NSMutableString = NSMutableString()
+        Xml.append("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n")
+        Xml.append("<Types xmlns=\"http://schemas.openxmlformats.org/package/2006/content-types\">")
+        Xml.append("<Default Extension=\"rels\" ContentType=\"application/vnd.openxmlformats-package.relationships+xml\" />")
+        Xml.append("<Default Extension=\"xml\" ContentType=\"application/xml\" />")
+        Xml.append("<Override PartName=\"/xl/workbook.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml\" />")
+        for i in 1...Sheets.count {
+            Xml.append("<Override PartName=\"/xl/worksheets/sheet\(i).xml\" ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml\" />")
+        }
+        
+//        Xml.append("<Default ContentType=\"image/png\" Extension=\"png\"/>") //Not existing in repaired
+        Xml.append("<Override PartName=\"/xl/theme/theme1.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.theme+xml\" />")
+        Xml.append("<Override PartName=\"/xl/styles.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml\" />")
+        Xml.append("<Override PartName=\"/xl/sharedStrings.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.sharedStrings+xml\" />")
+        Xml.append("<Override PartName=\"/docProps/core.xml\" ContentType=\"application/vnd.openxmlformats-package.core-properties+xml\" />")
+        Xml.append("<Override PartName=\"/docProps/app.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.extended-properties+xml\" />")
+        
+        //NOTE: Temporary remove maybe required if there is drawing
+//        for i in 1...Sheets.count {
+//            if Sheets[i-1].drawingsSheetrels != nil {
+//                Xml.append("<Override ContentType=\"application/vnd.openxmlformats-officedocument.drawing+xml\" PartName=\"/xl/drawings/drawing\(i).xml\"/>")
+//            }
+//        }
+        
+        
+       
+       
+        Xml.append("</Types>")
+        return String(Xml)
+    }
+    
+    
     private var WorkBookXmlRelsStringsOriginal:String {
         let Xml:NSMutableString = NSMutableString()
         let str = """
@@ -592,15 +654,17 @@ final public class XWorkBook{
     private var WorkBookXmlRelsStrings:String{
         let Xml:NSMutableString = NSMutableString()
         Xml.append("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?><Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\">")
+       
+        let str = """
+<Relationship Id="rId\(Sheets.count+2)" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
+<Relationship Id="rId\(Sheets.count+1)" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme" Target="theme/theme1.xml"/>
+"""
+        Xml.append(str)
         for i in 1...Sheets.count {
             Xml.append("<Relationship Id=\"rId\(i)\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet\" Target=\"worksheets/sheet\(i).xml\"/>")
         }
-        let str = """
-<Relationship Id="rId\(Sheets.count+1)" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme" Target="theme/theme1.xml"/>
-<Relationship Id="rId\(Sheets.count+2)" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
-<Relationship Id="rId\(Sheets.count+3)" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/sharedStrings" Target="sharedStrings.xml"/>
-"""
-        Xml.append(str)
+        
+        Xml.append("<Relationship Id=\"rId\(Sheets.count+3)\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/sharedStrings\" Target=\"sharedStrings.xml\"/>")
         Xml.append("</Relationships>")
         return String(Xml)
     }
@@ -613,7 +677,7 @@ final public class XWorkBook{
         Xml.append("<workbookPr/>")
         Xml.append("<sheets>")
         for i in 1...Sheets.count {
-            Xml.append("<sheet state=\"visible\" name=\"\(Sheets[i-1].title)\" sheetId=\"\(i)\" r:id=\"rId\(i)\"/>")
+            Xml.append("<sheet state=\"visible\" name=\"\(Sheets[i-1].title)\" sheetId=\"\(i)\" r:id=\"rId\(i+3)\"/>")
         }
         
         
@@ -633,7 +697,7 @@ final public class XWorkBook{
         Xml.append("<workbookPr/>")
         Xml.append("<sheets>")
         for i in 1...Sheets.count {
-            Xml.append("<sheet state=\"visible\" name=\"\(Sheets[i-1].title)\" sheetId=\"\(i)\" r:id=\"rId\(i+3)\"/>")
+            Xml.append("<sheet state=\"visible\" name=\"\(Sheets[i-1].title)\" sheetId=\"\(i)\" r:id=\"rId\(i)\"/>")
         }
         
         
@@ -663,6 +727,7 @@ final public class XWorkBook{
         let BasePath = "\(CachePath)/\(FolderId)"
         self.CheckCreateDirectory(path: BasePath)
         self.CheckCreateDirectory(path: "\(BasePath)/_rels")
+        self.CheckCreateDirectory(path: "\(BasePath)/docProps")
         self.CheckCreateDirectory(path: "\(BasePath)/xl")
         self.CheckCreateDirectory(path: "\(BasePath)/xl/media")
         
@@ -675,7 +740,7 @@ final public class XWorkBook{
         
         self.CheckCreateDirectory(path: "\(BasePath)/xl/_rels")
         self.CheckCreateDirectory(path: "\(BasePath)/xl/worksheets")
-        self.CheckCreateDirectory(path: "\(BasePath)/xl/worksheets/_rels")
+//        self.CheckCreateDirectory(path: "\(BasePath)/xl/worksheets/_rels")
         self.CheckCreateDirectory(path: "\(BasePath)/xl/drawings")
         self.CheckCreateDirectory(path: "\(BasePath)/xl/drawings/_rels")
         
@@ -689,6 +754,8 @@ final public class XWorkBook{
         
         if(showModified){
             self.Write(data: self.rels, tofile: "\(BasePath)/_rels/.rels")
+            self.Write(data: self.docPropApp, tofile: "\(BasePath)/docProps/app.xml")
+            self.Write(data: self.docPropCore, tofile: "\(BasePath)/docProps/core.xml")
             self.Write(data: self.SharedStrings, tofile: "\(BasePath)/xl/sharedStrings.xml")
             self.Write(data: self.StyleStrings, tofile: "\(BasePath)/xl/styles.xml")
             self.Write(data: self.ContentTypesStrings, tofile: "\(BasePath)/[Content_Types].xml")
@@ -696,7 +763,7 @@ final public class XWorkBook{
             self.Write(data: self.WorkBookXmlStrings, tofile: "\(BasePath)/xl/workbook.xml")
         }else{
             self.Write(data: self.relsOriginal, tofile: "\(BasePath)/_rels/.rels")
-            self.Write(data: self.SharedStrings, tofile: "\(BasePath)/xl/sharedStrings.xml")
+            self.Write(data: self.SharedStringsOriginal, tofile: "\(BasePath)/xl/sharedStrings.xml")
             self.Write(data: self.StyleStrings, tofile: "\(BasePath)/xl/styles.xml")
             self.Write(data: self.ContentTypesStrings, tofile: "\(BasePath)/[Content_Types].xml")
             self.Write(data: self.WorkBookXmlRelsStringsOriginal, tofile: "\(BasePath)/xl/_rels/workbook.xml.rels")
@@ -722,7 +789,8 @@ final public class XWorkBook{
                 rels = "\(rels)\(drawingsSheetrels)"
             }
             rels = "\(rels)\(self.HeadSheedXMLEnd)"
-            self.Write(data: rels, tofile: "\(BasePath)/xl/worksheets/_rels/sheet\(i).xml.rels")
+            //NOTE: This may be required if there are drawings
+//            self.Write(data: rels, tofile: "\(BasePath)/xl/worksheets/_rels/sheet\(i).xml.rels")
             
             i += 1
         }

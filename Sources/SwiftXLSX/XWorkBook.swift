@@ -41,6 +41,8 @@ final public class XWorkBook{
     private var valss:Set<String> = Set([])
     private var CHARSIZE:[UInt64:CGFloat] = [:]
     
+    private let showModified:Bool = false
+    
     public init() {}
     
     var count:Int {
@@ -69,9 +71,7 @@ final public class XWorkBook{
         self.Borders.removeAll()
         self.xfs.removeAll()
         self.vals.removeAll()
-        self.vals.append("")
         self.valss.removeAll()
-        self.valss.insert("")
         self.CHARSIZE.removeAll()
         self.Bgcolor.removeAll()
     }
@@ -465,6 +465,10 @@ final public class XWorkBook{
         return true
     }
     
+    private var relsOriginal:String {
+        "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n<Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\"><Relationship Id=\"rId1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument\" Target=\"xl/workbook.xml\"/></Relationships>"
+    }
+    
     private var rels:String {
         "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n<Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\"><Relationship Id=\"rId1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument\" Target=\"xl/workbook.xml\"/></Relationships>"
     }
@@ -568,7 +572,7 @@ final public class XWorkBook{
         return String(Xml)
     }
     
-    private var WorkBookXmlRelsStrings:String {
+    private var WorkBookXmlRelsStringsOriginal:String {
         let Xml:NSMutableString = NSMutableString()
         let str = """
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -582,6 +586,42 @@ final public class XWorkBook{
             Xml.append("<Relationship Id=\"rId\(i+3)\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet\" Target=\"worksheets/sheet\(i).xml\"/>")
         }
         Xml.append("</Relationships>")
+        return String(Xml)
+    }
+    
+    private var WorkBookXmlRelsStrings:String{
+        let Xml:NSMutableString = NSMutableString()
+        Xml.append("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?><Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\">")
+        for i in 1...Sheets.count {
+            Xml.append("<Relationship Id=\"rId\(i)\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet\" Target=\"worksheets/sheet\(i).xml\"/>")
+        }
+        let str = """
+<Relationship Id="rId\(Sheets.count+1)" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme" Target="theme/theme1.xml"/>
+<Relationship Id="rId\(Sheets.count+2)" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
+<Relationship Id="rId\(Sheets.count+3)" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/sharedStrings" Target="sharedStrings.xml"/>
+"""
+        Xml.append(str)
+        Xml.append("</Relationships>")
+        return String(Xml)
+    }
+    
+    private var WorkBookXmlStringsOriginal:String {
+        let Xml:NSMutableString = NSMutableString()
+        
+        Xml.append("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n")
+        Xml.append("<workbook xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\" xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\" xmlns:mx=\"http://schemas.microsoft.com/office/mac/excel/2008/main\" xmlns:mc=\"http://schemas.openxmlformats.org/markup-compatibility/2006\" xmlns:mv=\"urn:schemas-microsoft-com:mac:vml\" xmlns:x14=\"http://schemas.microsoft.com/office/spreadsheetml/2009/9/main\" xmlns:x15=\"http://schemas.microsoft.com/office/spreadsheetml/2010/11/main\" xmlns:x14ac=\"http://schemas.microsoft.com/office/spreadsheetml/2009/9/ac\" xmlns:xm=\"http://schemas.microsoft.com/office/excel/2006/main\">")
+        Xml.append("<workbookPr/>")
+        Xml.append("<sheets>")
+        for i in 1...Sheets.count {
+            Xml.append("<sheet state=\"visible\" name=\"\(Sheets[i-1].title)\" sheetId=\"\(i)\" r:id=\"rId\(i)\"/>")
+        }
+        
+        
+        
+        Xml.append("</sheets>")
+        Xml.append("<definedNames/>")
+        Xml.append("<calcPr/>")
+        Xml.append("</workbook>")
         return String(Xml)
     }
     
@@ -647,13 +687,23 @@ final public class XWorkBook{
 """
         self.Write(data: style, tofile: "\(BasePath)/xl/theme/theme1.xml")
         
+        if(showModified){
+            self.Write(data: self.rels, tofile: "\(BasePath)/_rels/.rels")
+            self.Write(data: self.SharedStrings, tofile: "\(BasePath)/xl/sharedStrings.xml")
+            self.Write(data: self.StyleStrings, tofile: "\(BasePath)/xl/styles.xml")
+            self.Write(data: self.ContentTypesStrings, tofile: "\(BasePath)/[Content_Types].xml")
+            self.Write(data: self.WorkBookXmlRelsStrings, tofile: "\(BasePath)/xl/_rels/workbook.xml.rels")
+            self.Write(data: self.WorkBookXmlStrings, tofile: "\(BasePath)/xl/workbook.xml")
+        }else{
+            self.Write(data: self.relsOriginal, tofile: "\(BasePath)/_rels/.rels")
+            self.Write(data: self.SharedStrings, tofile: "\(BasePath)/xl/sharedStrings.xml")
+            self.Write(data: self.StyleStrings, tofile: "\(BasePath)/xl/styles.xml")
+            self.Write(data: self.ContentTypesStrings, tofile: "\(BasePath)/[Content_Types].xml")
+            self.Write(data: self.WorkBookXmlRelsStringsOriginal, tofile: "\(BasePath)/xl/_rels/workbook.xml.rels")
+            self.Write(data: self.WorkBookXmlStringsOriginal, tofile: "\(BasePath)/xl/workbook.xml")
+        }
         
-        self.Write(data: self.rels, tofile: "\(BasePath)/_rels/.rels")
-        self.Write(data: self.SharedStrings, tofile: "\(BasePath)/xl/sharedStrings.xml")
-        self.Write(data: self.StyleStrings, tofile: "\(BasePath)/xl/styles.xml")
-        self.Write(data: self.ContentTypesStrings, tofile: "\(BasePath)/[Content_Types].xml")
-        self.Write(data: self.WorkBookXmlRelsStrings, tofile: "\(BasePath)/xl/_rels/workbook.xml.rels")
-        self.Write(data: self.WorkBookXmlStrings, tofile: "\(BasePath)/xl/workbook.xml")
+      
         
         var i = 1
         for sheet in Sheets {

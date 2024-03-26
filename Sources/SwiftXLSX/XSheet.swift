@@ -45,7 +45,7 @@ final public class XSheet{
     public func ForColumnSetWidth(_ column:Int,_ Width:Int){
         self.ColW[column] = Width
     }
-    
+     
     public var GetMaxRowCol : (row:Int,col:Int) {
         var maxRC:(row: Int,col: Int) = (row:0,col:0)
         for Cell in self.cells {

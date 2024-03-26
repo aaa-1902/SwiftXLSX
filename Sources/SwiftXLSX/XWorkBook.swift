@@ -114,6 +114,26 @@ final public class XWorkBook{
             cell.idFill = index
         }else{
             self.Bgcolor.append(hexcolor)
+            let patternFillNone = "<fill><patternFill patternType=\"none\"/></fill>"
+            let Fontxml = "<fill><patternFill patternType=\"gray125\" /></fill>"
+            
+            if let indexfill = self.Fills.firstIndex(of: Fontxml) {
+                cell.idFill = indexfill
+            }else{
+                self.Fills.append(patternFillNone)
+                self.Fills.append(Fontxml)
+                cell.idFill = self.Fills.count-1
+            }
+        }
+    }
+    
+    private func findFillsOriginal(_ cell:XCell){
+        let hexcolor = cell.colorbackground.Hex!
+        
+        if let index = self.Bgcolor.firstIndex(of: hexcolor) {
+            cell.idFill = index
+        }else{
+            self.Bgcolor.append(hexcolor)
             let Fontxml = "<fill><patternFill patternType=\"solid\"><fgColor rgb=\"\(hexcolor)\"/><bgColor indexed=\"64\"/></patternFill></fill>"
             
             if let indexfill = self.Fills.firstIndex(of: Fontxml) {
@@ -147,7 +167,7 @@ final public class XWorkBook{
             if let (_,ind) = self.xfs[idval] {
                 cell.idStyle = ind
             }else{
-                let xf = "<xf fontId=\"\(cell.idFont)\" numFmtId=\"0\" fillId=\"\(cell.idFill)\" borderId=\"\(cell.Border ? "1" : "0")\" applyFont=\"1\" applyNumberFormat=\"0\" applyFill=\"1\" applyBorder=\"1\" applyAlignment=\"1\"><alignment horizontal=\"\(cell.alignmentHorizontal.str())\" vertical=\"\(cell.alignmentVertical.str())\" textRotation=\"0\" wrapText=\"true\" shrinkToFit=\"false\"/></xf>"
+                let xf = "<xf numFmtId=\"0\" fontId=\"\(cell.idFont)\" fillId=\"\(cell.idFill)\" borderId=\"\(cell.Border ? "1" : "0")\" xfId=\"0\" applyFont=\"1\" applyBorder=\"1\" applyAlignment=\"1\"><alignment horizontal=\"\(cell.alignmentHorizontal.str())\" vertical=\"\(cell.alignmentVertical.str())\" wrapText=\"1\" /></xf>"
                 cell.idStyle = self.xfs.count
                 self.xfs[idval] = (xf,self.xfs.count)
             }
@@ -269,14 +289,31 @@ final public class XWorkBook{
         
         self.Fonts[0] = ("<font><sz val=\"10\"/><color rgb=\"FF000000\"/><name val=\"Arial\"/></font>",0)
         
-        self.Fills.append("<fill><patternFill patternType=\"solid\"><fgColor rgb=\"FFFFFFFF\"/><bgColor indexed=\"64\"/></patternFill></fill>")
-        
+        self.Fills.append("""
+        <fill>
+                    <patternFill patternType="none" />
+                </fill>
+""")
+        self.Fills.append("""
+        <fill>
+                    <patternFill patternType="gray125" />
+                </fill>
+""")
         self.Bgcolor.append("FFFFFFFF")
         
-        self.xfs[0] = ("<xf fontId=\"0\" numFmtId=\"0\" fillId=\"0\" borderId=\"0\" applyFont=\"1\" applyNumberFormat=\"0\" applyFill=\"1\" applyBorder=\"1\" applyAlignment=\"1\"><alignment horizontal=\"center\" vertical=\"center\" textRotation=\"0\" wrapText=\"true\" shrinkToFit=\"false\"/></xf>",0)
+        self.xfs[0] = ("<xf numFmtId=\"0\" fontId=\"0\" fillId=\"0\" borderId=\"0\" xfId=\"0\" applyAlignment=\"1\"><alignment horizontal=\"center\" vertical=\"center\" wrapText=\"1\" /></xf>",0)
         
-        self.Borders.append("<border/>");
-        self.Borders.append("<border><left style=\"thin\"><color rgb=\"FF000000\"/></left><right style=\"thin\"><color rgb=\"FF000000\"/></right><top style=\"thin\"><color rgb=\"FF000000\"/></top><bottom style=\"thin\"><color rgb=\"FF000000\"/></bottom></border>");
+//        self.Borders.append("<border/>");//Original
+        self.Borders.append("""
+        <border>
+            <left />
+            <right />
+            <top />
+            <bottom />
+            <diagonal />
+        </border>
+""");//Original
+        self.Borders.append("<border><left style=\"thin\"><color rgb=\"FF000000\"/></left><right style=\"thin\"><color rgb=\"FF000000\"/></right><top style=\"thin\"><color rgb=\"FF000000\"/></top><bottom style=\"thin\"><color rgb=\"FF000000\"/></bottom><diagonal /></border>");
         
         
         for sheet in self {
@@ -291,6 +328,142 @@ final public class XWorkBook{
     }
     
     private func BuildSheet(_ sheet:XSheet){
+        sheet.buildindex()
+        let Xml:NSMutableString = NSMutableString()
+        Xml.append("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n")
+        Xml.append("""
+        <worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"
+                   xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+                   xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+                   mc:Ignorable="x14ac xr xr2 xr3"
+                   xmlns:x14ac="http://schemas.microsoft.com/office/spreadsheetml/2009/9/ac"
+                   xmlns:xr="http://schemas.microsoft.com/office/spreadsheetml/2014/revision"
+                   xmlns:xr2="http://schemas.microsoft.com/office/spreadsheetml/2015/revision2"
+                   xmlns:xr3="http://schemas.microsoft.com/office/spreadsheetml/2016/revision3"
+                   xr:uid="{00000000-0001-0000-0000-000000000000}">
+""")
+        
+        let (numrows,numcols) = sheet.GetMaxRowCol
+        
+        if numrows>0 {
+            Xml.append("<dimension ref=\"A1:\(XSheet.EncodeNumberABC(numcols-1))\(numrows)\"/>")
+        }
+        
+        Xml.append("<sheetViews>")
+        if (sheet.fix.row + sheet.fix.col) == 0 {
+            Xml.append("<sheetView workbookViewId=\"0\" />")
+        }else if sheet.fix.row > 0 , sheet.fix.col == 0 {
+            Xml.append("<sheetView workbookViewId=\"0\">")
+            Xml.append("<pane ySplit=\"\(sheet.fix.row)\" topLeftCell=\"A\(sheet.fix.row+1)\" activePane=\"bottomLeft\" state=\"frozen\"/>")
+            Xml.append("</sheetView>")
+        }else if sheet.fix.row == 0 , sheet.fix.col > 0 {
+            Xml.append("<sheetView workbookViewId=\"0\">")
+            Xml.append("<pane xSplit=\"\(sheet.fix.col)\" topLeftCell=\"\(XSheet.EncodeNumberABC(sheet.fix.col))1\" activePane=\"topRight\" state=\"frozen\"/>")
+            Xml.append("</sheetView>")
+        }else{
+            Xml.append("<sheetView workbookViewId=\"0\">")
+            Xml.append("<pane xSplit=\"\(sheet.fix.col)\" ySplit=\"\(sheet.fix.row)\" topLeftCell=\"\(XSheet.EncodeNumberABC(sheet.fix.col))\(sheet.fix.row+1)\" activePane=\"bottomRight\" state=\"frozen\"/>")
+            Xml.append("</sheetView>")
+        }
+        Xml.append("</sheetViews>")
+        Xml.append("<sheetFormatPr baseColWidth=\"10\" defaultColWidth=\"18\" defaultRowHeight=\"15.75\" customHeight=\"1\"/>")
+        
+        if numcols>0 {
+            Xml.append("<cols>")
+            for col:Int in 1...numcols {
+                var wcalc:CGFloat = 50
+                if sheet.ColW.count > 0 {
+                    let w = sheet.ColW[col]
+                    if w != nil {
+                        wcalc = CGFloat(w!)
+                    }else{
+                        wcalc  = CGFloat(sheet.GetMaxWidth(col, numrows))
+                    }
+                }else{
+                    wcalc  = CGFloat(sheet.GetMaxWidth(col, numrows))
+                }
+                wcalc = wcalc * (0.16666016 * 1.2)//0.12499512
+                
+                Xml.append("<col min=\"\(col)\" max=\"\(col == numcols ? 16384 : col)\" width=\"\(wcalc)\" customWidth=\"1\"/>")
+            }
+            Xml.append("</cols>")
+        }
+        
+        
+        
+        Xml.append("<sheetData>")
+        var hasimages = false
+        if numrows == 0 {
+            Xml.append("<row r=\"1\" spans=\"1:1\"><c r=\"A1\"/></row>")
+        }else{
+            for row:Int in 1...numrows {
+                let colls:NSMutableString = NSMutableString()
+                for col:Int in 1...numcols {
+                    if let cell = sheet.Get(XCoords(row: row, col: col)) {
+                        /// output  values
+                        if let value = cell.value {
+                            switch value {
+                            case .text(_):
+                                if cell.idVal != nil {
+                                    /// this is text value and insert like id
+                                    colls.append("<c r=\"\(XSheet.EncodeNumberABC(col-1))\(row)\" s=\"\(cell.idStyle)\" t=\"s\"><v>\(cell.idVal!)</v></c>")
+                                }else{
+                                    /// output empty cell
+                                    colls.append("<c r=\"\(XSheet.EncodeNumberABC(col-1))\(row)\" s=\"\(cell.idStyle >= 0 ? cell.idStyle : 0)\" />")
+                                }
+                            case .double(let val):
+                                colls.append("<c r=\"\(XSheet.EncodeNumberABC(col-1))\(row)\" s=\"\(cell.idStyle)\" ><v>\(String(format: "%.3f", val))</v></c>")
+                            case .float(let val):
+                                colls.append("<c r=\"\(XSheet.EncodeNumberABC(col-1))\(row)\" s=\"\(cell.idStyle)\" ><v>\(String(format: "%.3f", val))</v></c>")
+                            case.integer(let val):
+                                colls.append("<c r=\"\(XSheet.EncodeNumberABC(col-1))\(row)\" s=\"\(cell.idStyle)\" ><v>\(val)</v></c>")
+                            case .long(let val):
+                                colls.append("<c r=\"\(XSheet.EncodeNumberABC(col-1))\(row)\" s=\"\(cell.idStyle)\" ><v>\(val)</v></c>")
+                            case .icon(_):
+                                /// output empty cell
+                                hasimages = true
+                                colls.append("<c r=\"\(XSheet.EncodeNumberABC(col-1))\(row)\" s=\"\(cell.idStyle >= 0 ? cell.idStyle : 0)\" />")
+                            }
+                        }else{
+                            colls.append("<c r=\"\(XSheet.EncodeNumberABC(col-1))\(row)\" s=\"\(cell.idStyle >= 0 ? cell.idStyle : 0)\" />")
+                        }
+                        
+                    }else{
+                        /// no cell with coords (row,col)
+                        colls.append("<c r=\"\(XSheet.EncodeNumberABC(col-1))\(row)\" s=\"0\" />")
+                    }
+                }
+                if let ht = sheet.RowH[row] {
+                    Xml.append("<row r=\"\(row)\" spans=\"1:\(numcols)\" ht=\"\(ht)\" customHeight=\"1\">")
+                }else{
+                    Xml.append("<row r=\"\(row)\" spans=\"1:\(numcols)\">")
+                }
+                Xml.append(String(colls))
+                colls.setString("")
+                Xml.append("</row>")
+            }
+        }
+        Xml.append("</sheetData>")
+        if hasimages {
+            Xml.append("<drawing r:id=\"rId1\"/>")
+        }
+        
+        
+        
+        if sheet.mergecells.count > 0 {
+            Xml.append("<mergeCells count=\"\(sheet.mergecells.count)\">")
+            for addr in sheet.mergecells {
+                Xml.append("<mergeCell ref=\"\(addr)\"/>")
+            }
+            Xml.append("</mergeCells>")
+        }
+        
+        Xml.append("</worksheet>")
+        sheet.xml = String(Xml)
+        Xml.setString("")
+    }
+    
+    private func BuildSheetOriginal(_ sheet:XSheet){
         sheet.buildindex()
         let Xml:NSMutableString = NSMutableString()
         Xml.append("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n")
@@ -416,12 +589,18 @@ final public class XWorkBook{
         Xml.setString("")
     }
     
-    private func BuildSheets() {
+    private func BuildSheetsOriginal() {
+        for sheet in self {
+            self.BuildSheetOriginal(sheet)
+        }
+    }
+    
+    
+    private func BuildSheets(){
         for sheet in self {
             self.BuildSheet(sheet)
         }
     }
-    
     
     
     
@@ -471,9 +650,18 @@ final public class XWorkBook{
     
     private var rels:String {
         """
-<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n
-<Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\">
-<Relationship Id=\"rId1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument\" Target=\"xl/workbook.xml\"/></Relationships>
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+    <Relationship Id="rId3"
+                  Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties"
+                  Target="docProps/app.xml" />
+    <Relationship Id="rId2"
+                  Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties"
+                  Target="docProps/core.xml" />
+    <Relationship Id="rId1"
+                  Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument"
+                  Target="xl/workbook.xml" />
+</Relationships>
 """
     }
     
@@ -513,7 +701,21 @@ final public class XWorkBook{
         return String(Xml)
     }
     
-    private var StyleStrings:String {
+    private var ThemeStringsOriginal:String{
+                """
+        <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+        <a:theme xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" name="Sheets"><a:themeElements><a:clrScheme name="Sheets"><a:dk1><a:srgbClr val="000000"/></a:dk1><a:lt1><a:srgbClr val="FFFFFF"/></a:lt1><a:dk2><a:srgbClr val="000000"/></a:dk2><a:lt2><a:srgbClr val="FFFFFF"/></a:lt2><a:accent1><a:srgbClr val="4285F4"/></a:accent1><a:accent2><a:srgbClr val="EA4335"/></a:accent2><a:accent3><a:srgbClr val="FBBC04"/></a:accent3><a:accent4><a:srgbClr val="34A853"/></a:accent4><a:accent5><a:srgbClr val="FF6D01"/></a:accent5><a:accent6><a:srgbClr val="46BDC6"/></a:accent6><a:hlink><a:srgbClr val="1155CC"/></a:hlink><a:folHlink><a:srgbClr val="1155CC"/></a:folHlink></a:clrScheme><a:fontScheme name="Sheets"><a:majorFont><a:latin typeface="Arial"/><a:ea typeface="Arial"/><a:cs typeface="Arial"/></a:majorFont><a:minorFont><a:latin typeface="Arial"/><a:ea typeface="Arial"/><a:cs typeface="Arial"/></a:minorFont></a:fontScheme><a:fmtScheme name="Office"><a:fillStyleLst><a:solidFill><a:schemeClr val="phClr"/></a:solidFill><a:gradFill rotWithShape="1"><a:gsLst><a:gs pos="0"><a:schemeClr val="phClr"><a:lumMod val="110000"/><a:satMod val="105000"/><a:tint val="67000"/></a:schemeClr></a:gs><a:gs pos="50000"><a:schemeClr val="phClr"><a:lumMod val="105000"/><a:satMod val="103000"/><a:tint val="73000"/></a:schemeClr></a:gs><a:gs pos="100000"><a:schemeClr val="phClr"><a:lumMod val="105000"/><a:satMod val="109000"/><a:tint val="81000"/></a:schemeClr></a:gs></a:gsLst><a:lin ang="5400000" scaled="0"/></a:gradFill><a:gradFill rotWithShape="1"><a:gsLst><a:gs pos="0"><a:schemeClr val="phClr"><a:satMod val="103000"/><a:lumMod val="102000"/><a:tint val="94000"/></a:schemeClr></a:gs><a:gs pos="50000"><a:schemeClr val="phClr"><a:satMod val="110000"/><a:lumMod val="100000"/><a:shade val="100000"/></a:schemeClr></a:gs><a:gs pos="100000"><a:schemeClr val="phClr"><a:lumMod val="99000"/><a:satMod val="120000"/><a:shade val="78000"/></a:schemeClr></a:gs></a:gsLst><a:lin ang="5400000" scaled="0"/></a:gradFill></a:fillStyleLst><a:lnStyleLst><a:ln w="6350" cap="flat" cmpd="sng" algn="ctr"><a:solidFill><a:schemeClr val="phClr"/></a:solidFill><a:prstDash val="solid"/><a:miter lim="800000"/></a:ln><a:ln w="12700" cap="flat" cmpd="sng" algn="ctr"><a:solidFill><a:schemeClr val="phClr"/></a:solidFill><a:prstDash val="solid"/><a:miter lim="800000"/></a:ln><a:ln w="19050" cap="flat" cmpd="sng" algn="ctr"><a:solidFill><a:schemeClr val="phClr"/></a:solidFill><a:prstDash val="solid"/><a:miter lim="800000"/></a:ln></a:lnStyleLst><a:effectStyleLst><a:effectStyle><a:effectLst/></a:effectStyle><a:effectStyle><a:effectLst/></a:effectStyle><a:effectStyle><a:effectLst><a:outerShdw blurRad="57150" dist="19050" dir="5400000" algn="ctr" rotWithShape="0"><a:srgbClr val="000000"><a:alpha val="63000"/></a:srgbClr></a:outerShdw></a:effectLst></a:effectStyle></a:effectStyleLst><a:bgFillStyleLst><a:solidFill><a:schemeClr val="phClr"/></a:solidFill><a:solidFill><a:schemeClr val="phClr"><a:tint val="95000"/><a:satMod val="170000"/></a:schemeClr></a:solidFill><a:gradFill rotWithShape="1"><a:gsLst><a:gs pos="0"><a:schemeClr val="phClr"><a:tint val="93000"/><a:satMod val="150000"/><a:shade val="98000"/><a:lumMod val="102000"/></a:schemeClr></a:gs><a:gs pos="50000"><a:schemeClr val="phClr"><a:tint val="98000"/><a:satMod val="130000"/><a:shade val="90000"/><a:lumMod val="103000"/></a:schemeClr></a:gs><a:gs pos="100000"><a:schemeClr val="phClr"><a:shade val="63000"/><a:satMod val="120000"/></a:schemeClr></a:gs></a:gsLst><a:lin ang="5400000" scaled="0"/></a:gradFill></a:bgFillStyleLst></a:fmtScheme></a:themeElements></a:theme>
+        """
+    }
+    
+    private var ThemeStrings:String{
+        """
+        <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+        <a:theme xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" name="Office Theme"><a:themeElements><a:clrScheme name="Office"><a:dk1><a:sysClr val="windowText" lastClr="000000"/></a:dk1><a:lt1><a:sysClr val="window" lastClr="FFFFFF"/></a:lt1><a:dk2><a:srgbClr val="0E2841"/></a:dk2><a:lt2><a:srgbClr val="E8E8E8"/></a:lt2><a:accent1><a:srgbClr val="156082"/></a:accent1><a:accent2><a:srgbClr val="E97132"/></a:accent2><a:accent3><a:srgbClr val="196B24"/></a:accent3><a:accent4><a:srgbClr val="0F9ED5"/></a:accent4><a:accent5><a:srgbClr val="A02B93"/></a:accent5><a:accent6><a:srgbClr val="4EA72E"/></a:accent6><a:hlink><a:srgbClr val="467886"/></a:hlink><a:folHlink><a:srgbClr val="96607D"/></a:folHlink></a:clrScheme><a:fontScheme name="Office"><a:majorFont><a:latin typeface="Aptos Display" panose="02110004020202020204"/><a:ea typeface=""/><a:cs typeface=""/><a:font script="Jpan" typeface="游ゴシック Light"/><a:font script="Hang" typeface="맑은 고딕"/><a:font script="Hans" typeface="等线 Light"/><a:font script="Hant" typeface="新細明體"/><a:font script="Arab" typeface="Times New Roman"/><a:font script="Hebr" typeface="Times New Roman"/><a:font script="Thai" typeface="Tahoma"/><a:font script="Ethi" typeface="Nyala"/><a:font script="Beng" typeface="Vrinda"/><a:font script="Gujr" typeface="Shruti"/><a:font script="Khmr" typeface="MoolBoran"/><a:font script="Knda" typeface="Tunga"/><a:font script="Guru" typeface="Raavi"/><a:font script="Cans" typeface="Euphemia"/><a:font script="Cher" typeface="Plantagenet Cherokee"/><a:font script="Yiii" typeface="Microsoft Yi Baiti"/><a:font script="Tibt" typeface="Microsoft Himalaya"/><a:font script="Thaa" typeface="MV Boli"/><a:font script="Deva" typeface="Mangal"/><a:font script="Telu" typeface="Gautami"/><a:font script="Taml" typeface="Latha"/><a:font script="Syrc" typeface="Estrangelo Edessa"/><a:font script="Orya" typeface="Kalinga"/><a:font script="Mlym" typeface="Kartika"/><a:font script="Laoo" typeface="DokChampa"/><a:font script="Sinh" typeface="Iskoola Pota"/><a:font script="Mong" typeface="Mongolian Baiti"/><a:font script="Viet" typeface="Times New Roman"/><a:font script="Uigh" typeface="Microsoft Uighur"/><a:font script="Geor" typeface="Sylfaen"/><a:font script="Armn" typeface="Arial"/><a:font script="Bugi" typeface="Leelawadee UI"/><a:font script="Bopo" typeface="Microsoft JhengHei"/><a:font script="Java" typeface="Javanese Text"/><a:font script="Lisu" typeface="Segoe UI"/><a:font script="Mymr" typeface="Myanmar Text"/><a:font script="Nkoo" typeface="Ebrima"/><a:font script="Olck" typeface="Nirmala UI"/><a:font script="Osma" typeface="Ebrima"/><a:font script="Phag" typeface="Phagspa"/><a:font script="Syrn" typeface="Estrangelo Edessa"/><a:font script="Syrj" typeface="Estrangelo Edessa"/><a:font script="Syre" typeface="Estrangelo Edessa"/><a:font script="Sora" typeface="Nirmala UI"/><a:font script="Tale" typeface="Microsoft Tai Le"/><a:font script="Talu" typeface="Microsoft New Tai Lue"/><a:font script="Tfng" typeface="Ebrima"/></a:majorFont><a:minorFont><a:latin typeface="Aptos Narrow" panose="02110004020202020204"/><a:ea typeface=""/><a:cs typeface=""/><a:font script="Jpan" typeface="游ゴシック"/><a:font script="Hang" typeface="맑은 고딕"/><a:font script="Hans" typeface="等线"/><a:font script="Hant" typeface="新細明體"/><a:font script="Arab" typeface="Arial"/><a:font script="Hebr" typeface="Arial"/><a:font script="Thai" typeface="Tahoma"/><a:font script="Ethi" typeface="Nyala"/><a:font script="Beng" typeface="Vrinda"/><a:font script="Gujr" typeface="Shruti"/><a:font script="Khmr" typeface="DaunPenh"/><a:font script="Knda" typeface="Tunga"/><a:font script="Guru" typeface="Raavi"/><a:font script="Cans" typeface="Euphemia"/><a:font script="Cher" typeface="Plantagenet Cherokee"/><a:font script="Yiii" typeface="Microsoft Yi Baiti"/><a:font script="Tibt" typeface="Microsoft Himalaya"/><a:font script="Thaa" typeface="MV Boli"/><a:font script="Deva" typeface="Mangal"/><a:font script="Telu" typeface="Gautami"/><a:font script="Taml" typeface="Latha"/><a:font script="Syrc" typeface="Estrangelo Edessa"/><a:font script="Orya" typeface="Kalinga"/><a:font script="Mlym" typeface="Kartika"/><a:font script="Laoo" typeface="DokChampa"/><a:font script="Sinh" typeface="Iskoola Pota"/><a:font script="Mong" typeface="Mongolian Baiti"/><a:font script="Viet" typeface="Arial"/><a:font script="Uigh" typeface="Microsoft Uighur"/><a:font script="Geor" typeface="Sylfaen"/><a:font script="Armn" typeface="Arial"/><a:font script="Bugi" typeface="Leelawadee UI"/><a:font script="Bopo" typeface="Microsoft JhengHei"/><a:font script="Java" typeface="Javanese Text"/><a:font script="Lisu" typeface="Segoe UI"/><a:font script="Mymr" typeface="Myanmar Text"/><a:font script="Nkoo" typeface="Ebrima"/><a:font script="Olck" typeface="Nirmala UI"/><a:font script="Osma" typeface="Ebrima"/><a:font script="Phag" typeface="Phagspa"/><a:font script="Syrn" typeface="Estrangelo Edessa"/><a:font script="Syrj" typeface="Estrangelo Edessa"/><a:font script="Syre" typeface="Estrangelo Edessa"/><a:font script="Sora" typeface="Nirmala UI"/><a:font script="Tale" typeface="Microsoft Tai Le"/><a:font script="Talu" typeface="Microsoft New Tai Lue"/><a:font script="Tfng" typeface="Ebrima"/></a:minorFont></a:fontScheme><a:fmtScheme name="Office"><a:fillStyleLst><a:solidFill><a:schemeClr val="phClr"/></a:solidFill><a:gradFill rotWithShape="1"><a:gsLst><a:gs pos="0"><a:schemeClr val="phClr"><a:lumMod val="110000"/><a:satMod val="105000"/><a:tint val="67000"/></a:schemeClr></a:gs><a:gs pos="50000"><a:schemeClr val="phClr"><a:lumMod val="105000"/><a:satMod val="103000"/><a:tint val="73000"/></a:schemeClr></a:gs><a:gs pos="100000"><a:schemeClr val="phClr"><a:lumMod val="105000"/><a:satMod val="109000"/><a:tint val="81000"/></a:schemeClr></a:gs></a:gsLst><a:lin ang="5400000" scaled="0"/></a:gradFill><a:gradFill rotWithShape="1"><a:gsLst><a:gs pos="0"><a:schemeClr val="phClr"><a:satMod val="103000"/><a:lumMod val="102000"/><a:tint val="94000"/></a:schemeClr></a:gs><a:gs pos="50000"><a:schemeClr val="phClr"><a:satMod val="110000"/><a:lumMod val="100000"/><a:shade val="100000"/></a:schemeClr></a:gs><a:gs pos="100000"><a:schemeClr val="phClr"><a:lumMod val="99000"/><a:satMod val="120000"/><a:shade val="78000"/></a:schemeClr></a:gs></a:gsLst><a:lin ang="5400000" scaled="0"/></a:gradFill></a:fillStyleLst><a:lnStyleLst><a:ln w="12700" cap="flat" cmpd="sng" algn="ctr"><a:solidFill><a:schemeClr val="phClr"/></a:solidFill><a:prstDash val="solid"/><a:miter lim="800000"/></a:ln><a:ln w="19050" cap="flat" cmpd="sng" algn="ctr"><a:solidFill><a:schemeClr val="phClr"/></a:solidFill><a:prstDash val="solid"/><a:miter lim="800000"/></a:ln><a:ln w="25400" cap="flat" cmpd="sng" algn="ctr"><a:solidFill><a:schemeClr val="phClr"/></a:solidFill><a:prstDash val="solid"/><a:miter lim="800000"/></a:ln></a:lnStyleLst><a:effectStyleLst><a:effectStyle><a:effectLst/></a:effectStyle><a:effectStyle><a:effectLst/></a:effectStyle><a:effectStyle><a:effectLst><a:outerShdw blurRad="57150" dist="19050" dir="5400000" algn="ctr" rotWithShape="0"><a:srgbClr val="000000"><a:alpha val="63000"/></a:srgbClr></a:outerShdw></a:effectLst></a:effectStyle></a:effectStyleLst><a:bgFillStyleLst><a:solidFill><a:schemeClr val="phClr"/></a:solidFill><a:solidFill><a:schemeClr val="phClr"><a:tint val="95000"/><a:satMod val="170000"/></a:schemeClr></a:solidFill><a:gradFill rotWithShape="1"><a:gsLst><a:gs pos="0"><a:schemeClr val="phClr"><a:tint val="93000"/><a:satMod val="150000"/><a:shade val="98000"/><a:lumMod val="102000"/></a:schemeClr></a:gs><a:gs pos="50000"><a:schemeClr val="phClr"><a:tint val="98000"/><a:satMod val="130000"/><a:shade val="90000"/><a:lumMod val="103000"/></a:schemeClr></a:gs><a:gs pos="100000"><a:schemeClr val="phClr"><a:shade val="63000"/><a:satMod val="120000"/></a:schemeClr></a:gs></a:gsLst><a:lin ang="5400000" scaled="0"/></a:gradFill></a:bgFillStyleLst></a:fmtScheme></a:themeElements><a:objectDefaults><a:lnDef><a:spPr/><a:bodyPr/><a:lstStyle/><a:style><a:lnRef idx="2"><a:schemeClr val="accent1"/></a:lnRef><a:fillRef idx="0"><a:schemeClr val="accent1"/></a:fillRef><a:effectRef idx="1"><a:schemeClr val="accent1"/></a:effectRef><a:fontRef idx="minor"><a:schemeClr val="tx1"/></a:fontRef></a:style></a:lnDef></a:objectDefaults><a:extraClrSchemeLst/><a:extLst><a:ext uri="{05A4C25C-085E-4340-85A3-A5531E510DB2}"><thm15:themeFamily xmlns:thm15="http://schemas.microsoft.com/office/thememl/2012/main" name="Office Theme" id="{2E142A2C-CD16-42D6-873A-C26D2A0506FA}" vid="{1BDDFF52-6CD6-40A5-AB3C-68EB2F1E4D0A}"/></a:ext></a:extLst></a:theme>
+        """
+    }
+    
+    private var StyleStringsOriginal:String {
         let Xml:NSMutableString = NSMutableString()
         
         Xml.append("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n")
@@ -570,6 +772,92 @@ final public class XWorkBook{
         Xml.append("<cellStyles count=\"1\">")
         Xml.append("<cellStyle name=\"Normal\" xfId=\"0\" builtinId=\"0\"/></cellStyles>")
         Xml.append("<dxfs count=\"0\"/>")
+        
+        Xml.append("</styleSheet>")
+        
+        return String(Xml)
+    }
+    
+    private var StyleStrings:String {
+        let Xml:NSMutableString = NSMutableString()
+        
+        Xml.append("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n")
+        Xml.append(
+"""
+        <styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"
+                    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+                    mc:Ignorable="x14ac x16r2 xr"
+                    xmlns:x14ac="http://schemas.microsoft.com/office/spreadsheetml/2009/9/ac"
+                    xmlns:x16r2="http://schemas.microsoft.com/office/spreadsheetml/2015/02/main"
+                    xmlns:xr="http://schemas.microsoft.com/office/spreadsheetml/2014/revision">
+""")
+        if Fonts.isEmpty {
+            Xml.append("<fonts count=\"0\"/>")
+        }else{
+            Xml.append("<fonts count=\"\(Fonts.count)\">")
+            let ar = Fonts.values.sorted(by: {  $0.1 < $1.1})
+            for (font,_) in ar {
+                Xml.append(font)
+            }
+            Xml.append("</fonts>")
+        }
+        
+        if Fills.isEmpty {
+            Xml.append("<fills count=\"0\"/>")
+        }else{
+            Xml.append("<fills count=\"\(Fills.count)\">")
+            for fill in Fills {
+                Xml.append(fill)
+            }
+            Xml.append("</fills>")
+        }
+        
+        if Borders.isEmpty {
+            Xml.append("<borders count=\"0\"/>")
+        }else{
+            Xml.append("<borders count=\"\(Borders.count)\">")
+            for border in Borders {
+                Xml.append(border)
+            }
+            Xml.append("</borders>")
+        }
+        
+        Xml.append("<cellStyleXfs count=\"1\">")
+        Xml.append("<xf numFmtId=\"0\" fontId=\"0\" fillId=\"0\" borderId=\"0\"/>")
+        Xml.append("</cellStyleXfs>")
+        
+        if xfs.isEmpty {
+            Xml.append("<cellXfs count=\"0\"/>")
+        }else{
+            Xml.append("<cellXfs count=\"\(xfs.count)\">")
+            
+            let ar = xfs.values.sorted(by: {  $0.1 < $1.1})
+            for (xf,_) in ar {
+                Xml.append(xf)
+            }
+            Xml.append("</cellXfs>")
+        }
+        
+        Xml.append("<cellStyles count=\"1\">")
+        Xml.append("<cellStyle name=\"Normal\" xfId=\"0\" builtinId=\"0\"/></cellStyles>")
+        Xml.append("<dxfs count=\"0\"/>")
+        Xml.append("""
+         <tableStyles count="0"
+                         defaultTableStyle="TableStyleMedium2"
+                         defaultPivotStyle="PivotStyleLight16" />
+""")
+        Xml.append("""
+<extLst>
+        <ext uri="{EB79DEF2-80B8-43e5-95BD-54CBDDF9020C}"
+             xmlns:x14="http://schemas.microsoft.com/office/spreadsheetml/2009/9/main">
+            <x14:slicerStyles defaultSlicerStyle="SlicerStyleLight1" />
+        </ext>
+        <ext uri="{9260A510-F301-46a8-8635-F512D64BE5F5}"
+             xmlns:x15="http://schemas.microsoft.com/office/spreadsheetml/2010/11/main">
+            <x15:timelineStyles defaultTimelineStyle="TimeSlicerStyleLight1" />
+        </ext>
+    </extLst>
+""")
         Xml.append("</styleSheet>")
         
         return String(Xml)
@@ -693,7 +981,17 @@ final public class XWorkBook{
         let Xml:NSMutableString = NSMutableString()
         
         Xml.append("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n")
-        Xml.append("<workbook xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\" xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\" xmlns:mx=\"http://schemas.microsoft.com/office/mac/excel/2008/main\" xmlns:mc=\"http://schemas.openxmlformats.org/markup-compatibility/2006\" xmlns:mv=\"urn:schemas-microsoft-com:mac:vml\" xmlns:x14=\"http://schemas.microsoft.com/office/spreadsheetml/2009/9/main\" xmlns:x15=\"http://schemas.microsoft.com/office/spreadsheetml/2010/11/main\" xmlns:x14ac=\"http://schemas.microsoft.com/office/spreadsheetml/2009/9/ac\" xmlns:xm=\"http://schemas.microsoft.com/office/excel/2006/main\">")
+        Xml.append("""
+        <workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"
+          xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+          xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+          mc:Ignorable="x15 xr xr6 xr10 xr2"
+          xmlns:x15="http://schemas.microsoft.com/office/spreadsheetml/2010/11/main"
+          xmlns:xr="http://schemas.microsoft.com/office/spreadsheetml/2014/revision"
+          xmlns:xr6="http://schemas.microsoft.com/office/spreadsheetml/2016/revision6"
+          xmlns:xr10="http://schemas.microsoft.com/office/spreadsheetml/2016/revision10"
+          xmlns:xr2="http://schemas.microsoft.com/office/spreadsheetml/2015/revision2">
+""")
         Xml.append("<workbookPr/>")
         Xml.append("<sheets>")
         for i in 1...Sheets.count {
@@ -729,7 +1027,7 @@ final public class XWorkBook{
         self.CheckCreateDirectory(path: "\(BasePath)/_rels")
         self.CheckCreateDirectory(path: "\(BasePath)/docProps")
         self.CheckCreateDirectory(path: "\(BasePath)/xl")
-        self.CheckCreateDirectory(path: "\(BasePath)/xl/media")
+//        self.CheckCreateDirectory(path: "\(BasePath)/xl/media")
         
         
         for (_,ximg) in XImages.list {
@@ -740,22 +1038,17 @@ final public class XWorkBook{
         
         self.CheckCreateDirectory(path: "\(BasePath)/xl/_rels")
         self.CheckCreateDirectory(path: "\(BasePath)/xl/worksheets")
-//        self.CheckCreateDirectory(path: "\(BasePath)/xl/worksheets/_rels")
-        self.CheckCreateDirectory(path: "\(BasePath)/xl/drawings")
-        self.CheckCreateDirectory(path: "\(BasePath)/xl/drawings/_rels")
+//        self.CheckCreateDirectory(path: "\(BasePath)/xl/worksheets/_rels") //NOTE: This is probably used to relate images and other objects inside the worksheet
+//        self.CheckCreateDirectory(path: "\(BasePath)/xl/drawings")
+//        self.CheckCreateDirectory(path: "\(BasePath)/xl/drawings/_rels")
         
         self.CheckCreateDirectory(path: "\(BasePath)/xl/theme")
-        
-        let style = """
-<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<a:theme xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" name="Sheets"><a:themeElements><a:clrScheme name="Sheets"><a:dk1><a:srgbClr val="000000"/></a:dk1><a:lt1><a:srgbClr val="FFFFFF"/></a:lt1><a:dk2><a:srgbClr val="000000"/></a:dk2><a:lt2><a:srgbClr val="FFFFFF"/></a:lt2><a:accent1><a:srgbClr val="4285F4"/></a:accent1><a:accent2><a:srgbClr val="EA4335"/></a:accent2><a:accent3><a:srgbClr val="FBBC04"/></a:accent3><a:accent4><a:srgbClr val="34A853"/></a:accent4><a:accent5><a:srgbClr val="FF6D01"/></a:accent5><a:accent6><a:srgbClr val="46BDC6"/></a:accent6><a:hlink><a:srgbClr val="1155CC"/></a:hlink><a:folHlink><a:srgbClr val="1155CC"/></a:folHlink></a:clrScheme><a:fontScheme name="Sheets"><a:majorFont><a:latin typeface="Arial"/><a:ea typeface="Arial"/><a:cs typeface="Arial"/></a:majorFont><a:minorFont><a:latin typeface="Arial"/><a:ea typeface="Arial"/><a:cs typeface="Arial"/></a:minorFont></a:fontScheme><a:fmtScheme name="Office"><a:fillStyleLst><a:solidFill><a:schemeClr val="phClr"/></a:solidFill><a:gradFill rotWithShape="1"><a:gsLst><a:gs pos="0"><a:schemeClr val="phClr"><a:lumMod val="110000"/><a:satMod val="105000"/><a:tint val="67000"/></a:schemeClr></a:gs><a:gs pos="50000"><a:schemeClr val="phClr"><a:lumMod val="105000"/><a:satMod val="103000"/><a:tint val="73000"/></a:schemeClr></a:gs><a:gs pos="100000"><a:schemeClr val="phClr"><a:lumMod val="105000"/><a:satMod val="109000"/><a:tint val="81000"/></a:schemeClr></a:gs></a:gsLst><a:lin ang="5400000" scaled="0"/></a:gradFill><a:gradFill rotWithShape="1"><a:gsLst><a:gs pos="0"><a:schemeClr val="phClr"><a:satMod val="103000"/><a:lumMod val="102000"/><a:tint val="94000"/></a:schemeClr></a:gs><a:gs pos="50000"><a:schemeClr val="phClr"><a:satMod val="110000"/><a:lumMod val="100000"/><a:shade val="100000"/></a:schemeClr></a:gs><a:gs pos="100000"><a:schemeClr val="phClr"><a:lumMod val="99000"/><a:satMod val="120000"/><a:shade val="78000"/></a:schemeClr></a:gs></a:gsLst><a:lin ang="5400000" scaled="0"/></a:gradFill></a:fillStyleLst><a:lnStyleLst><a:ln w="6350" cap="flat" cmpd="sng" algn="ctr"><a:solidFill><a:schemeClr val="phClr"/></a:solidFill><a:prstDash val="solid"/><a:miter lim="800000"/></a:ln><a:ln w="12700" cap="flat" cmpd="sng" algn="ctr"><a:solidFill><a:schemeClr val="phClr"/></a:solidFill><a:prstDash val="solid"/><a:miter lim="800000"/></a:ln><a:ln w="19050" cap="flat" cmpd="sng" algn="ctr"><a:solidFill><a:schemeClr val="phClr"/></a:solidFill><a:prstDash val="solid"/><a:miter lim="800000"/></a:ln></a:lnStyleLst><a:effectStyleLst><a:effectStyle><a:effectLst/></a:effectStyle><a:effectStyle><a:effectLst/></a:effectStyle><a:effectStyle><a:effectLst><a:outerShdw blurRad="57150" dist="19050" dir="5400000" algn="ctr" rotWithShape="0"><a:srgbClr val="000000"><a:alpha val="63000"/></a:srgbClr></a:outerShdw></a:effectLst></a:effectStyle></a:effectStyleLst><a:bgFillStyleLst><a:solidFill><a:schemeClr val="phClr"/></a:solidFill><a:solidFill><a:schemeClr val="phClr"><a:tint val="95000"/><a:satMod val="170000"/></a:schemeClr></a:solidFill><a:gradFill rotWithShape="1"><a:gsLst><a:gs pos="0"><a:schemeClr val="phClr"><a:tint val="93000"/><a:satMod val="150000"/><a:shade val="98000"/><a:lumMod val="102000"/></a:schemeClr></a:gs><a:gs pos="50000"><a:schemeClr val="phClr"><a:tint val="98000"/><a:satMod val="130000"/><a:shade val="90000"/><a:lumMod val="103000"/></a:schemeClr></a:gs><a:gs pos="100000"><a:schemeClr val="phClr"><a:shade val="63000"/><a:satMod val="120000"/></a:schemeClr></a:gs></a:gsLst><a:lin ang="5400000" scaled="0"/></a:gradFill></a:bgFillStyleLst></a:fmtScheme></a:themeElements></a:theme>
-"""
-        self.Write(data: style, tofile: "\(BasePath)/xl/theme/theme1.xml")
-        
+
         if(showModified){
             self.Write(data: self.rels, tofile: "\(BasePath)/_rels/.rels")
             self.Write(data: self.docPropApp, tofile: "\(BasePath)/docProps/app.xml")
             self.Write(data: self.docPropCore, tofile: "\(BasePath)/docProps/core.xml")
+            self.Write(data: self.ThemeStrings, tofile: "\(BasePath)/xl/theme/theme1.xml")
             self.Write(data: self.SharedStrings, tofile: "\(BasePath)/xl/sharedStrings.xml")
             self.Write(data: self.StyleStrings, tofile: "\(BasePath)/xl/styles.xml")
             self.Write(data: self.ContentTypesStrings, tofile: "\(BasePath)/[Content_Types].xml")
@@ -764,8 +1057,9 @@ final public class XWorkBook{
         }else{
             self.Write(data: self.relsOriginal, tofile: "\(BasePath)/_rels/.rels")
             self.Write(data: self.SharedStringsOriginal, tofile: "\(BasePath)/xl/sharedStrings.xml")
-            self.Write(data: self.StyleStrings, tofile: "\(BasePath)/xl/styles.xml")
-            self.Write(data: self.ContentTypesStrings, tofile: "\(BasePath)/[Content_Types].xml")
+            self.Write(data: self.ThemeStringsOriginal, tofile: "\(BasePath)/xl/theme/theme1.xml")
+            self.Write(data: self.StyleStringsOriginal, tofile: "\(BasePath)/xl/styles.xml")
+            self.Write(data: self.ContentTypesStringsOriginal, tofile: "\(BasePath)/[Content_Types].xml")
             self.Write(data: self.WorkBookXmlRelsStringsOriginal, tofile: "\(BasePath)/xl/_rels/workbook.xml.rels")
             self.Write(data: self.WorkBookXmlStringsOriginal, tofile: "\(BasePath)/xl/workbook.xml")
         }
